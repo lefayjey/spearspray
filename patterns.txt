@@ -1,0 +1,24 @@
+# User as pass
+{samaccountname}
+
+# Name + Year of the password change
+{name}{separator}{year}{suffix}
+# Name + Year of the password change in short format
+{name}{separator}{short_year}{suffix}
+# Name + Number of the month of the password change + Year of the password change in short format
+{name}{separator}{month_number}{short_year}{suffix}
+
+# Month of the password change + Year of the password change
+{month_en}{separator}{year}{suffix}
+# Month of the password change + Year of the password change in short format
+{month_en}{separator}{short_year}{suffix}
+
+# Season of the password change + Year of the password change
+{season_en}{separator}{year}{suffix}
+# Season of the password change + Year of the password change in short format
+{season_en}{separator}{short_year}{suffix}
+
+# Extra + Year of the password change
+{extra}{separator}{year}{suffix}
+# Extra + Year of the password change in short format
+{extra}{separator}{short_year}{suffix}
