@@ -1,24 +1,26 @@
-# User as pass
+# User (samaccountname) as pass
 {samaccountname}
 
-# Name + Year of the password change
+# User first name + Year
 {name}{separator}{year}{suffix}
-# Name + Year of the password change in short format
+# User first name + Year in short format
 {name}{separator}{short_year}{suffix}
-# Name + Number of the month of the password change + Year of the password change in short format
+# User first name + Month number + Year in short format
 {name}{separator}{month_number}{short_year}{suffix}
 
-# Month of the password change + Year of the password change
+# Month name + Year
 {month_en}{separator}{year}{suffix}
-# Month of the password change + Year of the password change in short format
+# Month name + Year in short format
 {month_en}{separator}{short_year}{suffix}
 
-# Season of the password change + Year of the password change
+# Season name + Year
 {season_en}{separator}{year}{suffix}
-# Season of the password change + Year of the password change in short format
+# Season name + Year in short format
 {season_en}{separator}{short_year}{suffix}
 
-# Extra + Year of the password change
+# Exact password from extra argument (e.g., -x 'Company')
+{extra}
+# Extra argument + Year
 {extra}{separator}{year}{suffix}
-# Extra + Year of the password change in short format
+# Extra argument + Year in short format
 {extra}{separator}{short_year}{suffix}
