@@ -108,7 +108,7 @@ def filter_threshold_users(users_objects: list[dict], domain_policy: dict, opera
         try:
             bad_count = int(raw_bad)
         except (TypeError, ValueError):
-            log.exception(f"{YELLOW}[*]{RESET} User {user.get('name', '<unknown>')} has invalid badPwdCount; treated as at risk.")
+            log.warning(f"{YELLOW}[*]{RESET} User {user.get('name', '<unknown>')} has invalid badPwdCount; treated as at risk.")
             users_at_risk.append(user)
             continue
 

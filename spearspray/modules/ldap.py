@@ -100,10 +100,12 @@ class Ldap:
                 attribute_value = [item.decode("utf-8", "ignore") for item in attribute_value]
 
             # Extract scalar values from single-item lists for specific attributes
-            if attribute_name in self.SCALAR_ATTRS and isinstance(attribute_value, list) and len(attribute_value) == 1:
-                normalized_attributes[attribute_name] = attribute_value[0]
-            else:
-                normalized_attributes[attribute_name] = attribute_value  # Keep original format
+            if attribute_name in self.SCALAR_ATTRS and isinstance(attribute_value, list):
+                if len(attribute_value) > 1:
+                    self.log.warning(f"{YELLOW}[*]{RESET} {len(attribute_value)} values found for scalar attribute '{attribute_name}', using first value")
+                attribute_value = attribute_value[0] if attribute_value else None
+
+            normalized_attributes[attribute_name] = attribute_value  # Keep original format
 
         return normalized_attributes
 
