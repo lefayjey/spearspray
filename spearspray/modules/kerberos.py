@@ -159,7 +159,7 @@ class Kerberos:
             self._classify_error(username, password, exc)
             return False
         except Exception as exc:
-            self._register_failure(username, "unexpected_error", str(exc))
+            self._register_failure(username, password, "unexpected_error", str(exc))
             return False
 
         self._register_valid(username, password)
@@ -252,6 +252,7 @@ class Kerberos:
             "KRB_AP_ERR_SKEW"           : (self._MSG_CLOCK_SKEW,       "error", "other_errors"),
             "KDC_UNREACH"               : (self._MSG_KDC_UNREACHABLE,  "error", "other_errors"),
             "KDC_ERR_ETYPE_NOSUPP"      : (self._MSG_ETYPE_NOSUPP,     "error", "other_errors"),
+            "unexpected_error"          : (self._MSG_UNKNOWN_ERROR,    "error", "other_errors"),
         }
 
         default_template = self._MSG_UNKNOWN_ERROR
