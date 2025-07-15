@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import random
+import re
 import tempfile
 import time
 import threading
@@ -60,6 +61,7 @@ class Kerberos:
     -1765328359: ("KDC_ERR_PREAUTH_REQUIRED", "pre-authentication required"),
     -1765328347: ("KRB_AP_ERR_SKEW", "clock skew too great"),
     -1765328228: ("KDC_UNREACH", "could not contact domain KDC"),
+    -1765328370: ("KDC_ERR_ETYPE_NOSUPP", "encryption type not supported"),
     }
 
     _MSG_VALID_CREDENTIAL = f"{GREEN}[+] %s:%s -> Valid credential{RESET}"
@@ -70,7 +72,8 @@ class Kerberos:
     _MSG_PREAUTH_REQUIRED = f"{BLUE}[±] %s -> Pre-authentication required{RESET}"
     _MSG_CLOCK_SKEW = f"{YELLOW}[!] %s -> Clock skew too large{RESET}"
     _MSG_KDC_UNREACHABLE = f"{RED}[!] %s -> Could not contact domain KDC{RESET}"
-    _MSG_UNKNOWN_ERROR = f"{RED}[?] {'{user}'}:{'{pwd}'} -> {'{msg}'}{RESET}"
+    _MSG_UNKNOWN_ERROR = f"{RED}[?] %s:%s -> Kerberos error %s: %s{RESET}"
+    _MSG_ETYPE_NOSUPP = f"{RED}[!] %s -> Encryption type not supported{RESET}"
 
     def __init__(self, domain: str, *, kdc: str, jitter: float = 0.0, max_rps: float | None = None) -> None:
 
@@ -178,7 +181,7 @@ class Kerberos:
 
         error_code, error_description = self.KRB_ERROR_CODES.get(
             krb_code,
-            ("kerberos_other", self._extract_exc_msg(exc)),
+            (krb_code, self._extract_exc_msg(exc)),
         )
 
         self.log.debug(f"[-] Auth failed for {username} -> {error_code} (min_code={krb_code}, maj_code={exc.maj_code})")
@@ -189,11 +192,20 @@ class Kerberos:
         """Extracts a human-readable error message from a GSSError."""
         try:
             raw = exc.gen_message()
-            return " ; ".join(raw) if isinstance(raw, (list, tuple)) else raw
+            full_message = " ; ".join(raw) if isinstance(raw, (list, tuple)) else raw
+            
+            # Try to extract just the Minor error message which contains the actual Kerberos error
+            if "Minor" in full_message:
+                # Look for pattern: "Minor (number): actual error message"
+                minor_match = re.search(r'Minor \(\d+\): (.+)', full_message)
+                if minor_match:
+                    return minor_match.group(1).strip()
+            
+            return full_message
         except Exception:
             return self.log.exception(f"{RED}[-]{RESET} Error extracting message from GSSError.")
 
-    def _update_credentials_and_log(self, dict_to_update: Dict[str, str], log_function, log_message_template: str, username: str, password: Optional[str] = None, error_code: Optional[str] = None) -> None:
+    def _update_credentials_and_log(self, dict_to_update: Dict[str, str], log_function, log_message_template: str, username: str, password: Optional[str] = None, error_code: Optional[str] = None, error_description: Optional[str] = None) -> None:
         """Thread-safely updates a credentials dictionary and logs the authentication result."""
         with self._lock:
 
@@ -207,8 +219,10 @@ class Kerberos:
             placeholder_count = log_message_template.count("%s")
             
             try:
-                if placeholder_count == 3: # Default template: Error code, username, password
-                    log_function(log_message_template, error_code, username, password)
+                if placeholder_count == 4: # Unknown error template: username, password, error_code, error_description
+                    log_function(log_message_template, username, password, error_code, error_description)
+                elif placeholder_count == 3: # Default template: username, password, error_description
+                    log_function(log_message_template, username, password, error_description or error_code)
                 elif placeholder_count == 2: # Username and password
                     log_function(log_message_template, username, password)
                 elif placeholder_count == 1: # Username only
@@ -226,7 +240,7 @@ class Kerberos:
         """Registers a valid credential and logs the success message."""
         self._update_credentials_and_log(self.valid_credentials, self.log.success, self._MSG_VALID_CREDENTIAL, username, password,)
 
-    def _register_failure(self, username: str, password: str, code: str, msg: str) -> None:
+    def _register_failure(self, username: str, password: str, error_code: str, error_description: str) -> None:
         """Prints the appropriate message based on Kerberos error code name and updates the corresponding dictionary."""
 
         template_map = { # Error code, message template, log level, dictionary to update
@@ -237,15 +251,16 @@ class Kerberos:
             "KDC_ERR_PREAUTH_REQUIRED"  : (self._MSG_PREAUTH_REQUIRED, "error", "failed_credentials"),
             "KRB_AP_ERR_SKEW"           : (self._MSG_CLOCK_SKEW,       "error", "other_errors"),
             "KDC_UNREACH"               : (self._MSG_KDC_UNREACHABLE,  "error", "other_errors"),
+            "KDC_ERR_ETYPE_NOSUPP"      : (self._MSG_ETYPE_NOSUPP,     "error", "other_errors"),
         }
 
-        default_template = self._MSG_UNKNOWN_ERROR.format(user="%s", pwd="%s", msg="%s")
-        message_template, level_name, dict_to_update = template_map.get(code, (default_template, "error", "other_errors"))
+        default_template = self._MSG_UNKNOWN_ERROR
+        message_template, level_name, dict_to_update = template_map.get(error_code, (default_template, "error", "other_errors"))
 
         dict_to_update = getattr(self, dict_to_update, self.other_errors) # Fallback to other_errors if not found
         log_level = getattr(self.log, level_name, self.log.error) # Get the logging method based on the level name (e.g., logger.warning, logger.critical, etc.)
 
-        self._update_credentials_and_log(dict_to_update, log_level, message_template, username, password, code)
+        self._update_credentials_and_log(dict_to_update, log_level, message_template, username, password, error_code, error_description)
 
     def cleanup(self) -> None:
         """Removes the temporary `krb5.conf` file if it exists and cleans up the environment variable."""
