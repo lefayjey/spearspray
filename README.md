@@ -1,6 +1,6 @@
 # SpearSpray
 
-**SpearSpray** is an advanced password spraying tool designed specifically for Active Directory environments. It combines user enumeration via LDAP with intelligent pattern-based password generation to perform controlled and stealthy password spraying attacks.
+**SpearSpray** is an advanced password spraying tool designed specifically for Active Directory environments. It combines user enumeration via LDAP with intelligent pattern-based password generation to perform controlled and stealthy password spraying attacks over Kerberos.
 
 ![Demo](./demo.gif)
 
@@ -26,12 +26,10 @@
   - [Default Patterns File (patterns.txt)](#default-patterns-file-patternstxt)
   - [Custom Pattern Examples](#custom-pattern-examples)
   - [Adding Custom Variables](#adding-custom-variables)
+- [SpearSpray Philosophy: More with Less](#spearspray-philosophy-more-with-less)
 - [Why Kerberos Authentication?](#why-kerberos-authentication)
-- [Security Considerations](#security-considerations)
-  - [Account Lockout Protection](#account-lockout-protection)
-  - [Stealth Features](#stealth-features)
-  - [Best Practices](#best-practices)
-- [Warning](#warning)
+- [Understanding badPwdCount Behavior](#understanding-badpwdcount-behavior)
+- [Warning and Security Considerations](#warning-and-security-considerations)
 - [Legal Disclaimer](#legal-disclaimer)
 - [Troubleshooting](#troubleshooting)
 - [Acknowledgments](#acknowledgments)
@@ -60,7 +58,7 @@
 ### Advanced Pattern System
 - **Dynamic Variables**: Support for user-specific data (name, date of last password change...)
 - **Custom Separators & Suffixes**: Flexible password pattern customization
-- **Extra Words**: Integration of company-specific terms and seasonal patterns
+- **Extra Argument**: Integration of company-specific terms.
 - **Interactive Pattern Selection**: Dynamic menu system for pattern selection
 
 ## Requirements
@@ -110,44 +108,6 @@ pip install git+https://github.com/sikumy/spearspray.git
 
 ## Usage
 
-### Basic Usage
-
-```bash
-# List available pattern variables
-spearspray -l
-
-# Basic password spraying with default settings
-spearspray -u administrator -p Password123 -d contoso.local -dc dc01.contoso.local
-
-# Use custom patterns file
-spearspray -u administrator -p Password123 -d contoso.local -dc dc01.contoso.local -i custom_patterns.txt
-
-# Add extra word for pattern generation
-spearspray -u administrator -p Password123 -d contoso.local -dc dc01.contoso.local -x "Contoso"
-```
-
-### Advanced Usage
-
-```bash
-# Full featured example with SSL, rate limiting, and custom separators
-spearspray -u administrator -p Password123 -d contoso.local -dc dc01.contoso.local \
-  --ssl \
-  --max-rps 2.0 \
-  -j 1.0,2.0 \
-  -t 5 \
-  -x "Company" \
-  -sep "@" \
-  -suf "!" \
-  -debug
-
-# Custom LDAP query to target specific users
-spearspray -u administrator -p Password123 -d contoso.local -dc dc01.contoso.local \
-  -q "(&(objectCategory=person)(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(department=IT))"
-
-# Conservative approach for stealth
-spearspray -u administrator -p Password123 -d contoso.local -dc dc01.contoso.local -t 5 --max-rps 3 -j 2.0,5.0 --ssl
-```
-
 ### Command Line Options
 
 #### LDAP Configuration
@@ -162,19 +122,76 @@ spearspray -u administrator -p Password123 -d contoso.local -dc dc01.contoso.loc
 #### Password Spraying Configuration
 - `-t, --threads`: Number of concurrent threads (default: 10)
 - `-j, --jitter`: Delay between attempts: N seconds or N,M range (default: 0)
-- `--max-rps`: Maximum Kerberos requests per second
-- `-thr, --threshold`: Password attempts buffer before lockout (default: 2)
+- `--max-rps`: Maximum Kerberos requests per second. If not set, no rate limiting is applied
+- `-thr, --threshold`: Number of attempts to leave as buffer before account lockout (default: 2)
 
 #### Pattern Configuration
-- `-i, --input`: Patterns file path (default: patterns.txt)
-- `-x, --extra`: Extra word for patterns (no spaces/commas)
-- `-sep, --separator`: Separator characters for patterns
-- `-suf, --suffix`: Suffix characters for patterns
+- `-i, --input`: Patterns file path (default: `patterns.txt`)
+- `-x, --extra`: Custom word to inject into password patterns via `{extra}` variable (e.g., companyName, no spaces/commas)
+- `-sep, --separator`: Separator characters for `{separator}` variable in patterns (default: none)
+- `-suf, --suffix`: Suffix characters for `{suffix}` variable in patterns (default: none)
 
 #### Other Options
 - `-s, --silent`: Don't display startup banner
-- `-debug`: Enable debug logging with file output
+- `--debug`: Enable debug logging with file output
 - `-l, --list`: List available pattern variables and exit
+
+### Basic Usage
+
+You can list available pattern variables with the following command:
+
+```bash
+# List available pattern variables
+spearspray -l
+```
+
+![List available pattern variables](./list.png)
+
+These variables are the ones you can use to create patterns in the `patterns.txt` file. If you want to know how to create your own variable, visit the section: [Adding Custom Variables](#adding-custom-variables).
+
+Below, you can see the two simplest SpearSpray commands:
+
+```bash
+# Basic password spraying with default settings
+spearspray -u lowUser -p Password123 -d contoso.local -dc dc01.contoso.local
+
+# Add extra word for pattern generation
+spearspray -u lowUser -p Password123 -d contoso.local -dc dc01.contoso.local -x "CompanyName"
+```
+
+The `--extra` (`-x`) parameter is very useful if you want to use a specific word in patterns or if you want to test the same password across all users. It all depends on the patterns you have written in `patterns.txt` that make use of the `{extra}` variable.
+
+### Advanced Usage
+
+SpearSpray supports a series of arguments that increase the customization of Password Spraying in all aspects and adapts to each scenario:
+
+```bash
+# Domain controllers might require an encrypted connection
+spearspray -u lowUser -p Password123 -d contoso.local -dc dc01.contoso.local --ssl
+
+# Perhaps you only want to perform Password Spraying on a specific group of users (SpearSpray allows it!)
+spearspray -u lowUser -p Password123 -d contoso.local -dc dc01.contoso.local \
+  -q "(&(objectCategory=person)(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2))(department=IT))"
+
+# You want to add symbols as separators or suffixes to passwords generated by patterns
+spearspray -u lowUser -p Password123 -d contoso.local -dc dc01.contoso.local -sep '@' -suf '!' 
+```
+
+### Stealth Usage
+
+You're conducting an operation or simply have a very sensitive environment and need to control SpearSpray's speed. There are several options available for this:
+
+```bash
+# You can try reducing the number of threads
+spearspray -u lowUser -p Password123 -d contoso.local -dc dc01.contoso.local -t 5
+
+# You can try adding a fixed jitter (N) or random jitter between two values (N,M)
+spearspray -u lowUser -p Password123 -d contoso.local -dc dc01.contoso.local -j 3,5
+
+# You can limit the requests per second that the tool makes
+spearspray -u lowUser -p Password123 -d contoso.local -dc dc01.contoso.local --max-rps 10
+```
+You can also combine all these arguments together.
 
 
 ## Pattern System
@@ -183,7 +200,7 @@ SpearSpray uses an advanced pattern system to generate **highly targeted and per
 
 ### Key Innovation: User-Specific Temporal Data
 
-**All temporal variables (years, months, seasons) are calculated based on each user's individual password change date (`pwdLastSet` attribute), not the current date.** This means that if a user changed their password in March 2024, the patterns will generate passwords using March 2024 data, significantly increasing the likelihood of success.
+**All temporal variables (years, months, seasons) are calculated based on each user's individual password change date (`pwdLastSet` attribute), not the current date.** This means that if a user changed their password in March 2024, the patterns will generate passwords for that user using March 2024 data. This personalized approach is applied to each user individually based on their own password change timeline, significantly increasing the likelihood of success.
 
 ### Available Variables
 
@@ -201,6 +218,8 @@ SpearSpray uses an advanced pattern system to generate **highly targeted and per
 | `{extra}` | Extra word provided via `-x` argument | CompanyName |
 | `{separator}` | Custom separator via `-sep` argument | @ |
 | `{suffix}` | Custom suffix via `-suf` argument | ! |
+
+**Note**: The conversion mappings for temporal variables (months and seasons) are defined in `spearspray/utils/constants.py`.
 
 ### Default Patterns File (patterns.txt)
 
@@ -235,7 +254,7 @@ SpearSpray uses an advanced pattern system to generate **highly targeted and per
 
 ### Custom Pattern Examples
 
-**Example scenario**: User "Eren" changed his password on March 15, 2024. Using the extra word "Paradis", separator "@", and suffix "!", the patterns would generate:
+**Example scenario**: User "Eren" changed his password on March 15, 2024. If you use the extra word "Paradis", separator "@", and suffix "!", some patterns that will be generated are:
 
 - `{extra}{suffix}` → `Paradis!`
 - `{name}{separator}{year}{suffix}` → `Eren@2024!` *(based on his March 2024 password change)*
@@ -272,6 +291,8 @@ def variable_resolver(user: dict, selected_pattern: str, variables: list, extra:
             # Your custom logic here
             values[var.name] = "your_custom_value"
 ```
+3. If you need it, you can use the file `spearspray/utils/constants.py` to define constants. Then, in the `variable_resolver` function you simply need to call it using `constants.VARIABLE`. You can see the examples of months and seasons to see how to implement your own.
+
 
 **Example**: Adding a domain variable that extracts the domain from the user's email:
 ```python
@@ -286,12 +307,29 @@ elif var.name == "domain":
 
 You can then use `{domain}` in your patterns file to include the user's email domain in password generation.
 
+## SpearSpray Philosophy: More with Less
+
+SpearSpray's core philosophy is **achieving more with less** - maximizing effectiveness while minimizing attempts and detection risk.
+
+### Smart Temporal Logic
+Human behavior is nuanced. A user changing their password in **December 2024** might use `Company2025!` (thinking ahead to the fiscal year), while someone in **late March** might already reference `Spring2024!`. While SpearSpray's patterns based on `pwdLastSet` won't catch these edge cases, the logical approach still achieves higher hit rates with fewer attempts compared to generic wordlists.
+
+### Flexible Methodology
+- **🎯 Targeted**: Personalized passwords per user (default behavior)
+- **🌐 Universal**: Same password across all users via `{extra}` pattern
+
+### The "Less" Principle
+- **Fewer attempts**: Smart `badPwdCount` filtering + intelligent patterns
+- **Lower detection**: Kerberos pre-auth vs traditional methods  
+- **Reduced lockouts**: Built-in safety margins + policy awareness
+- **Minimal infrastructure**: Dynamic generation vs wordlist management
+
 ## Why Kerberos Authentication?
 
 SpearSpray uses **Kerberos pre-authentication** instead of traditional methods to reduce detection:
 
-Traditional methods (NTLM/SMB/LDAP) generate highly monitored events like **4625** (failed logons).  
-Kerberos pre-auth generates **Event 4768** (TGT requested - valid credentials) and **4771** (pre-authentication failed - invalid attempts), which are less monitored by most SOCs.
+**Traditional methods** (NTLM/SMB/LDAP) generate highly monitored events like **4625** (failed logons).  
+**Kerberos pre-auth** generates **Event 4768** (TGT requested - valid credentials) and **4771** (pre-authentication failed - invalid attempts), which are less monitored by most SOCs.
 
 **Performance advantage**: Uses **gssapi** library instead of impacket for Kerberos operations. Native C bindings provide significantly faster authentication compared to Python-only implementations.
 
@@ -304,36 +342,97 @@ This helps prevent overwhelming the domain controller and reduces detection risk
 
 **Benefits**: Less noise, blends with normal AD traffic, faster execution, lower detection risk.
 
-## Security Considerations
+## Understanding badPwdCount Behavior
 
-### Account Lockout Protection
-SpearSpray automatically:
-- Retrieves domain password policy via LDAP
-- Filters users based on current `badPwdCount`
-- Respects the threshold margin to prevent lockouts
-- Identifies users with Password Settings Objects (PSO)
+### References
+- [Spiceworks – badPwdCount not resetting after threshold](https://community.spiceworks.com/t/badpwdcount-not-resetting-after-threshold/939628)
+- [Spiceworks – badPwdCount not resetting](https://community.spiceworks.com/t/badpwdcount-not-resetting/435486)
+- [Microsoft public NG – Reset badPwdCount in ADAM](https://microsoft.public.windows.server.active-directory.narkive.com/2SHRmIY1/reset-badpwdcount-in-adam)
+- [Microsoft TechNet Wiki – Active Directory: Bad Passwords and Account Lockout](https://learn.microsoft.com/en-us/archive/technet-wiki/32490.active-directory-bad-passwords-and-account-lockout)
 
-### Stealth Features
-- **Jitter**: Add random delays between authentication attempts
-- **Threading**: Control concurrency to avoid detection
-- **Rate Limiting**: Use `--max-rps` to control requests per second and avoid detection
-- **LDAPS**: Use encrypted LDAP connections when possible
-- **Query Filtering**: Exclude service accounts and sync accounts
+### 1. What `badPwdCount` **is**
+* A **per-DC, non-replicated** counter of consecutive bad logons for one account.
+* Tied to these lockout-policy knobs:  
 
-### Best Practices
-1. **Always test in authorized environments only**
-2. **Start with conservative thread counts and jitter values**
-3. **Monitor domain controllers for detection**
-4. **Respect organizational security policies**
-5. **Use appropriate threshold margins to prevent lockouts**
+| AD attribute | GPO label | Typical default | Purpose |
+|--------------|-----------|-----------------|---------|
+| `lockoutThreshold` | **Account lockout threshold** | 5 | How many bad attempts trigger lockout |
+| `lockoutObservationWindow` | **Reset account lockout counter after** | 30 min | Idle time **after which the next attempt forces an internal reset** |
+| `lockoutDuration` | **Account lockout duration** | 30 min | How long the account stays locked (0 = needs admin) |
 
-## Warning
+---
+
+### 2. How the counter really moves
+
+| Event | Counter action | Stored on | Why |
+|-------|---------------|-----------|-----|
+| Wrong password **≠** user’s two most‑recent passwords | **+1** | DC that handled the request <br>(PDC‑emulator also +1 by chaining) | Normal increment |
+| Wrong password **matches** **n‑1 / n‑2** in password history¹ | **No change** | Same DC | Windows 2003+ “n‑2” feature |
+| Successful logon | **Sets that DC’s copy to 0** | Same DC only | Immediate reset |
+| Bad attempt **after** ObservationWindow | DC first sets copy to 0, then **+1** | Same DC | “On‑demand” reset – **not** a timer |
+| Manual unlock or `lockoutDuration` ends | **All DCs set to 0** | All DCs | Global reset |
+
+¹ Requires `pwdHistoryLength` ≥ 3, Kerberos/NTLM auth. If the history is only 2, *only* the `n‑1` password is ignored. 
+
+---
+
+### 3.  Don’t mix these two facts
+
+| Situation | What LDAP shows | What the **next attempt** does |
+|-----------|-----------------|--------------------------------|
+| **Window NOT expired** (< 30 min since last bad)** | `badPwdCount = 4/5` | Increments → **lockout** |
+| **Window expired** (≥ 30 min, or hours/days later) | `badPwdCount` still *reads* 4 | Auto‑resets 0 → +1 → counter = 1 (no lockout) |
+
+*High numbers can “sit” for days until a DC sees more activity — the reset is triggered **by** that next attempt (or succesfull login), not by a clock.*
+
+---
+
+### 4. Finding the PDC-emulator
+
+To identify the PDC-emulator for your domain, you can use `nslookup` to query the `_ldap._tcp.pdc._msdcs.` DNS record:
+
+```bash
+# Find PDC-emulator for domain.com
+nslookup -type=SRV _ldap._tcp.pdc._msdcs.domain.com
+
+# Example output:
+# Server: 8.8.8.8
+# Address: 8.8.8.8#53
+# 
+# _ldap._tcp.pdc._msdcs.domain.com service = 0 100 389 DC01.domain.com.
+```
+
+The PDC-emulator FQDN will be shown in the service record (e.g., `DC01.domain.com`). Use this value with SpearSpray's `-dc` parameter to ensure you're always querying the most authoritative source for `badPwdCount` values.
+
+**Why use the PDC-emulator?**
+- **Highest badPwdCount values**: The PDC-emulator typically holds the most up-to-date and highest `badPwdCount` values due to its role in account lockout processing
+- **Centralized lockout processing**: All account lockouts are processed through the PDC-emulator, making it the authoritative source for lockout-related information
+- **Consistent counter tracking**: By querying the same DC (PDC-emulator) for both policy retrieval and user enumeration, you get consistent `badPwdCount` values
+- **Reduced false negatives**: Other DCs might have stale or lower `badPwdCount` values, potentially leading to missed high-risk users
+
+---
+
+### 5. Recommended Safe Workflow
+
+```bash
+# 1. Ask PDC for current counters + policy
+# 2. Exclude users at (threshold − thr) or above
+# 3. Spray Kerberos against a single DC
+# 4. Wait ≥ lockoutObservationWindow
+# 5. Loop back to step 1
+```
+
+⚠️ **Important**: Despite all safety measures, password spraying always carries inherent risks. Please review the [Warning and Security Considerations](#warning-and-security-considerations) section for critical safety considerations before proceeding.
+
+## Warning and Security Considerations
 
 **Account Lockout Risk**: While SpearSpray implements multiple safeguards to minimize the risk of account lockouts (including domain policy retrieval, PSO detection, and badPwdCount filtering), **there is always an inherent risk when performing password spraying attacks**. Please proceed with extreme caution and always:
 
 - Test in authorized environments only
 - Start with very conservative settings (low thread counts, high jitter values)
 - Monitor domain controllers for unexpected behavior
+- Respect organizational security policies
+- Use appropriate threshold margins to prevent lockouts
 - Have a rollback plan in case of issues
 
 **Development Notice**: This is my first security tool and while I'm continuously learning programming, I acknowledge there's still much room for improvement. Any feedback, suggestions, or contributions are greatly welcomed to help make this tool better and safer for the security community.
@@ -374,6 +473,15 @@ These tools have been invaluable sources of learning and inspiration. Special th
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests, report bugs, or suggest enhancements.
+
+### TODO
+
+**Currently working on:**
+- Add support for accounts that have their password stored in an algorithm other than AES (perhaps because they are legacy accounts)
+
+**Planned improvements:**
+- Modify LDAP authentication to obtain users and domain policy information. Switch from NTLM to Kerberos for consistency with the password spraying mechanism
+- Investigate the feasibility of introducing empty password testing. Initial tests have been challenging due to using the gssapi library instead of impacket (Impacket for Kerberos spraying was too slow, which is why we opted for gssapi)
 
 ## License
 
