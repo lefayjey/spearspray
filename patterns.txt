@@ -18,7 +18,7 @@
 # Season name + Year in short format
 {season_en}{separator}{short_year}{suffix}
 
-# Exact password from extra argument (e.g., -x 'Company')
+# Exact password from extra argument (e.g., -x 'Company123$!')
 {extra}
 # Extra argument + Year
 {extra}{separator}{year}{suffix}
