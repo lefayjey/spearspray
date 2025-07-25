@@ -112,11 +112,11 @@ class Kerberos:
             " dns_lookup_kdc = false\n"            # enable if you want to generate legitimate DNS traffic (make spraying a bit more slower).
             " dns_lookup_realm = false\n"          # enable if you want to generate legitimate DNS traffic (make spraying a bit more slower).
             " udp_preference_limit = 1465\n"
-            " allow_weak_crypto = false\n"         # avoids RC4/DES3
+            " allow_weak_crypto = false\n"         # avoids DES -> https://web.mit.edu/kerberos/krb5-1.12/doc/admin/conf_files/krb5_conf.html#libdefaults
             " forwardable = false\n"
-            " default_tkt_enctypes = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96\n"
-            " default_tgs_enctypes = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96\n"
-            " permitted_enctypes  = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96\n"
+            " default_tkt_enctypes = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96 rc4-hmac\n"
+            " default_tgs_enctypes = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96 rc4-hmac\n"
+            " permitted_enctypes  = aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96 rc4-hmac\n"
             "\n"
             "[realms]\n"
             f"{self.domain} = {{\n"
