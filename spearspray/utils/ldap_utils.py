@@ -72,9 +72,9 @@ def get_users_from_ldap(ldap_instance, ldap_connection, query, fields):
 
     if search_entries:
         if len(search_entries) == 1:
-            log.success(f"{GREEN}[+]{RESET} Found {len(search_entries)} user.")
+            log.success(f"{GREEN}[+]{RESET} Found {len(search_entries)} enabled user.")
         else:
-            log.success(f"{GREEN}[+]{RESET} Found {len(search_entries)} users.")
+            log.success(f"{GREEN}[+]{RESET} Found {len(search_entries)} enabled users.")
         return search_entries
     else:
         log.error(f"{RED}[-]{RESET} No users found.")
