@@ -96,20 +96,23 @@ def filter_threshold_users(users_objects: list[dict], domain_policy: dict, opera
     users_safe: list[dict] = []
 
     limit = domain_threshold - operator_threshold
+    badpwd_errors = 0
 
     for user in users_objects:
         raw_bad = user.get("badPwdCount", None)
 
         if raw_bad is None:
-            log.warning(f"{YELLOW}[*]{RESET} User {user.get('sAMAccountName', '<unknown>')} missing badPwdCount; treated as at risk.")
+            log.debug(f"{YELLOW}[*]{RESET} User {user.get('sAMAccountName', '<unknown>')} missing badPwdCount; treated as at risk.")
             users_at_risk.append(user)
+            badpwd_errors += 1
             continue
 
         try:
             bad_count = int(raw_bad)
         except (TypeError, ValueError):
-            log.warning(f"{YELLOW}[*]{RESET} User {user.get('name', '<unknown>')} has invalid badPwdCount; treated as at risk.")
+            log.debug(f"{YELLOW}[*]{RESET} User {user.get('name', '<unknown>')} has invalid badPwdCount; treated as at risk.")
             users_at_risk.append(user)
+            badpwd_errors += 1
             continue
 
         if bad_count >= limit:
@@ -118,6 +121,8 @@ def filter_threshold_users(users_objects: list[dict], domain_policy: dict, opera
             users_safe.append(user)
 
     if users_at_risk:
+        if badpwd_errors > 0:
+            log.warning(f"{YELLOW}[*]{RESET} {badpwd_errors} user(s) with invalid or missing badPwdCount treated as at risk. If the number of affected accounts is high, consider changing DC (preferably the PDC).")
         log.warning(f"{YELLOW}[*]{RESET} {len(users_at_risk)} account(s) have ≤ {operator_threshold} attempt(s) remaining and will be skipped.")
     else:
         log.info(f"{YELLOW}[*]{RESET} No accounts close to lock-out detected.")
