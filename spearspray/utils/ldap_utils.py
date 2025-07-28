@@ -62,7 +62,7 @@ def handle_domain_password_policy(domain_policy: dict) -> None:
     log.info(
         f"[!] Threshold: {threshold_str}, "
         f"Lock-out Duration: {_format_minutes(duration)}, "
-        f"Observation Window: {_format_minutes(window)}"
+        f"Observation Window: {_format_minutes(window)}."
     )
 
 
@@ -122,7 +122,8 @@ def filter_threshold_users(users_objects: list[dict], domain_policy: dict, opera
 
     if users_at_risk:
         if badpwd_errors > 0:
-            log.warning(f"{YELLOW}[*]{RESET} {badpwd_errors} user(s) with invalid or missing badPwdCount treated as at risk. If the number of affected accounts is high, consider changing DC (preferably the PDC).")
+            log.warning(f"{YELLOW}[*]{RESET} {badpwd_errors} user(s) with invalid or missing badPwdCount treated as at risk.")
+            log.info("[!] If the number of affected accounts is high, consider changing DC (preferably the PDC).")
         log.warning(f"{YELLOW}[*]{RESET} {len(users_at_risk)} account(s) have ≤ {operator_threshold} attempt(s) remaining and will be skipped.")
     else:
         log.info(f"{YELLOW}[*]{RESET} No accounts close to lock-out detected.")
