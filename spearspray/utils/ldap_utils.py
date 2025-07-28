@@ -58,9 +58,9 @@ def handle_domain_password_policy(domain_policy: dict) -> None:
     else:
         threshold_str = "N/A"
 
-    log.success(
-        f"{GREEN}[+]{RESET} Successfully retrieved Domain Password Policy. "
-        f"Threshold: {threshold_str}, "
+    log.success(f"{GREEN}[+]{RESET} Successfully retrieved Domain Password Policy.")
+    log.info(
+        f"[!] Threshold: {threshold_str}, "
         f"Lock-out Duration: {_format_minutes(duration)}, "
         f"Observation Window: {_format_minutes(window)}"
     )
