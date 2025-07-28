@@ -476,10 +476,6 @@ Contributions are welcome! Please feel free to submit pull requests, report bugs
 
 ### TODO
 
-**Currently working on:**
-- Add support for accounts that have their password stored in an algorithm other than AES (perhaps because they are legacy accounts)
-
-**Planned improvements:**
 - Modify LDAP authentication to obtain users and domain policy information. Switch from NTLM to Kerberos for consistency with the password spraying mechanism
 - Investigate the feasibility of introducing empty password testing. Initial tests have been challenging due to using the gssapi library instead of impacket (Impacket for Kerberos spraying was too slow, which is why we opted for gssapi)
 
