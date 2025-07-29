@@ -26,8 +26,8 @@ DEFAULT_LDAP_USERS_QUERY = (
     '(&'
     '(objectCategory=person)'
     '(objectClass=user)'
-    '(!(userAccountControl:1.2.840.113556.1.4.803:=2))'
-    '(!(|(samaccountname=*msol*)(samaccountname=*adsync*)))'
+    '(!(userAccountControl:1.2.840.113556.1.4.803:=2))' # Exclude disabled accounts
+    '(!(userAccountControl:1.2.840.113556.1.4.803:=16))' # Exclude blocked accounts
     ')'
 )
 
