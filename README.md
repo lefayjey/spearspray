@@ -115,7 +115,7 @@ pip install git+https://github.com/sikumy/spearspray.git
 - `-u, --username`: LDAP username **[Required]**
 - `-p, --password`: LDAP password **[Required]**
 - `-dc, --domain-controller`: FQDN or IP of domain controller **[Required]**
-- `-q, --query`: Custom LDAP query (default: enabled users excluding msol/adsync accounts)
+- `-q, --query`: Custom LDAP query (default: enabled users excluding blocked accounts)
 - `--ssl`: Use SSL/LDAPS connection (port 636)
 - `-lps, --ldap-page-size`: LDAP paging size (default: 200)
 
@@ -349,6 +349,9 @@ This helps prevent overwhelming the domain controller and reduces detection risk
 - [Spiceworks – badPwdCount not resetting](https://community.spiceworks.com/t/badpwdcount-not-resetting/435486)
 - [Microsoft public NG – Reset badPwdCount in ADAM](https://microsoft.public.windows.server.active-directory.narkive.com/2SHRmIY1/reset-badpwdcount-in-adam)
 - [Microsoft TechNet Wiki – Active Directory: Bad Passwords and Account Lockout](https://learn.microsoft.com/en-us/archive/technet-wiki/32490.active-directory-bad-passwords-and-account-lockout)
+- [Further abusing the badPwdCount attribute](https://blog.fox-it.com/2017/11/28/further-abusing-the-badpwdcount-attribute/)
+- [LDAP Wiki - Active Directory Account Lockout](https://ldapwiki.com/wiki/Wiki.jsp?page=Active%20Directory%20Account%20Lockout)
+- [LDAP Wiki - Active Directory Locked Accounts](https://ldapwiki.com/wiki/Wiki.jsp?page=Active%20Directory%20Locked%20Accounts)
 
 ### 1. What `badPwdCount` **is**
 * A **per-DC, non-replicated** counter of consecutive bad logons for one account.
@@ -359,8 +362,6 @@ This helps prevent overwhelming the domain controller and reduces detection risk
 | `lockoutThreshold` | **Account lockout threshold** | 5 | How many bad attempts trigger lockout |
 | `lockoutObservationWindow` | **Reset account lockout counter after** | 30 min | Idle time **after which the next attempt forces an internal reset** |
 | `lockoutDuration` | **Account lockout duration** | 30 min | How long the account stays locked (0 = needs admin) |
-
----
 
 ### 2. How the counter really moves
 
@@ -374,8 +375,6 @@ This helps prevent overwhelming the domain controller and reduces detection risk
 
 ¹ Requires `pwdHistoryLength` ≥ 3, Kerberos/NTLM auth. If the history is only 2, *only* the `n‑1` password is ignored. 
 
----
-
 ### 3.  Don’t mix these two facts
 
 | Situation | What LDAP shows | What the **next attempt** does |
@@ -383,34 +382,30 @@ This helps prevent overwhelming the domain controller and reduces detection risk
 | **Window NOT expired** (< 30 min since last bad)** | `badPwdCount = 4/5` | Increments → **lockout** |
 | **Window expired** (≥ 30 min, or hours/days later) | `badPwdCount` still *reads* 4 | Auto‑resets 0 → +1 → counter = 1 (no lockout) |
 
-*High numbers can “sit” for days until a DC sees more activity — the reset is triggered **by** that next attempt (or succesfull login), not by a clock.*
-
----
+*High numbers can “sit” for days until a DC sees more activity — the reset is triggered **by** that next attempt (or successfull login), not by a clock.*
 
 ### 4. Finding the PDC-emulator
 
 To identify the PDC-emulator for your domain, you can use `nslookup` to query the `_ldap._tcp.pdc._msdcs.` DNS record:
 
 ```bash
-# Find PDC-emulator for domain.com
-nslookup -type=SRV _ldap._tcp.pdc._msdcs.domain.com
+# Find PDC-emulator for fabrikam.local
+nslookup -type=SRV _ldap._tcp.pdc._msdcs.fabrikam.local
 
 # Example output:
-# Server: 8.8.8.8
-# Address: 8.8.8.8#53
+# Server: 10.150.16.10
+# Address: 10.150.16.10#53
 # 
-# _ldap._tcp.pdc._msdcs.domain.com service = 0 100 389 DC01.domain.com.
+# _ldap._tcp.pdc._msdcs.fabrikam.local service = 0 100 389 DC01.fabrikam.local.
 ```
 
-The PDC-emulator FQDN will be shown in the service record (e.g., `DC01.domain.com`). Use this value with SpearSpray's `-dc` parameter to ensure you're always querying the most authoritative source for `badPwdCount` values.
+The PDC-emulator FQDN will be shown in the service record (e.g., `DC01.fabrikam.local`). Use this value with SpearSpray's `-dc` parameter to ensure you're always querying the most authoritative source for `badPwdCount` values.
 
 **Why use the PDC-emulator?**
 - **Highest badPwdCount values**: The PDC-emulator typically holds the most up-to-date and highest `badPwdCount` values due to its role in account lockout processing
 - **Centralized lockout processing**: All account lockouts are processed through the PDC-emulator, making it the authoritative source for lockout-related information
 - **Consistent counter tracking**: By querying the same DC (PDC-emulator) for both policy retrieval and user enumeration, you get consistent `badPwdCount` values
 - **Reduced false negatives**: Other DCs might have stale or lower `badPwdCount` values, potentially leading to missed high-risk users
-
----
 
 ### 5. Recommended Safe Workflow
 
