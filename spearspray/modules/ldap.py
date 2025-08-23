@@ -47,9 +47,9 @@ class Ldap:
         """Connect to LDAP server with SSL fallback if required."""
         if self.use_ssl:
             try:
-                self.log.info("[!] Using SSL connection")
+                self.log.info("[!] Using SSL connection.")
                 ldap_connection = self._login()
-                self.log.success(f"{GREEN}[+]{RESET} LDAPS - Login successful")
+                self.log.success(f"{GREEN}[+]{RESET} LDAPS - Login successful.")
                 return ldap_connection
             except ldap3.core.exceptions.LDAPBindError:
                 self.log.exception(f"{RED}[-]{RESET} An error occurred during LDAPS connection.")
@@ -60,17 +60,17 @@ class Ldap:
 
         try:
             ldap_connection = self._login()
-            self.log.success(f"{GREEN}[+]{RESET} LDAP - Login successful")
+            self.log.success(f"{GREEN}[+]{RESET} LDAP - Login successful.")
             return ldap_connection
         except ldap3.core.exceptions.LDAPBindError as exc:
             # Handle server-enforced SSL requirement (common security policy)
             if "strongerAuthRequired" in str(exc):
-                self.log.info("[!] Server requires SSL, retrying with LDAPS")
+                self.log.info("[!] Server requires SSL, retrying with LDAPS.")
                 self.use_ssl = True
                 self.port = 636
                 try:
                     ldap_connection = self._login()
-                    self.log.success(f"{GREEN}[+]{RESET} LDAPS - Login successful")
+                    self.log.success(f"{GREEN}[+]{RESET} LDAPS - Login successful.")
                     return ldap_connection
                 except ldap3.core.exceptions.LDAPBindError:
                     self.log.exception(f"{RED}[-]{RESET} An error occurred during LDAPS connection.")
