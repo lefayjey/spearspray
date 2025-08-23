@@ -16,13 +16,19 @@ def parse_arguments():
 
     ldap_parser = argparse.ArgumentParser(add_help=False)
     ldap_group = ldap_parser.add_argument_group('LDAP Configuration', 'Configuration for LDAP connection')
-    ldap_group.add_argument('-d', '--domain', help='LDAP domain name (e.g., contoso.local) (required).')
+    ldap_group.add_argument('-d', '--domain', help='LDAP domain name (e.g., fabrikam.local) (required).')
     ldap_group.add_argument('-u', '--username', help='LDAP username (required).')
     ldap_group.add_argument('-p', '--password', help='LDAP password (required).')
     ldap_group.add_argument('-dc', '--domain-controller', type=str, metavar="DOMAIN_CONTROLLER", help='FQDN (recommended) or IP address of the domain controller (required).')
     ldap_group.add_argument('-q', '--query', default=DEFAULT_LDAP_USERS_QUERY, help='Custom LDAP query to retrieve users for spraying.')
     ldap_group.add_argument('--ssl', action='store_true', help='Use SSL connection for LDAP. Also known as LDAPS (default: False).' )
     ldap_group.add_argument('-lps', '--ldap-page-size', type=int, default=200, help='LDAP paging size for large result sets (default: 200).')
+
+    neo4j_parser = argparse.ArgumentParser(add_help=False)
+    neo4j_group = neo4j_parser.add_argument_group('Neo4j Configuration', 'Configuration for Neo4j connection. It will be use to mark users as owned')
+    neo4j_group.add_argument('-nu', '--neo4j-username', help='Neo4j username (optional).')
+    neo4j_group.add_argument('-np', '--neo4j-password', help='Neo4j password (optional).')
+    neo4j_group.add_argument('-uri', '--uri', default='bolt://localhost:7687', help='Neo4j URI (default: bolt://localhost:7687).')
 
     sprayingconfig_parser = argparse.ArgumentParser(add_help=False)
     sprayingconfig_group = sprayingconfig_parser.add_argument_group('Password spraying configuration', 'Configuration for stealthy and controlled password spraying')
@@ -47,7 +53,7 @@ def parse_arguments():
             f"{BOLD}> Author: {AUTHOR}{RESET}"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
-        parents=[ldap_parser, sprayingconfig_parser, patterns_parser]
+        parents=[ldap_parser, neo4j_parser, sprayingconfig_parser, patterns_parser]
     )
 
     parser.add_argument('-s', '--silent', action='store_true', help='Do not display the startup banner')
