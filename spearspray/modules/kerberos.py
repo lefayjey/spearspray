@@ -75,13 +75,14 @@ class Kerberos:
     _MSG_UNKNOWN_ERROR = f"{RED}[?] %s:%s -> Kerberos error %s: %s{RESET}"
     _MSG_ETYPE_NOSUPP = f"{RED}[!] %s -> Encryption type not supported{RESET}"
 
-    def __init__(self, domain: str, *, kdc: str, jitter: float = 0.0, max_rps: float | None = None) -> None:
+    def __init__(self, domain: str, *, kdc: str, jitter: float = 0.0, max_rps: float | None = None, neo4j_instance=None) -> None:
 
         # TODO: Maybe add Context Manager for simplifying cleanup after spraying
 
         self.domain: str = domain.upper()
         self.kdc: str = kdc.upper()
         self.jitter_min, self.jitter_max = jitter
+        self.neo4j_instance = neo4j_instance
 
         self.log = logging.getLogger(__name__)
 
@@ -92,6 +93,9 @@ class Kerberos:
         self.valid_usernames: Dict[str, str] = {} 
         self.failed_credentials: Dict[str, str] = {}
         self.other_errors: Dict[str, str] = {}
+        
+        # Counter for Neo4j owned users
+        self.neo4j_owned_count: int = 0
 
         self._krb5_conf = self._create_krb5_config()
         self.rate_limiter = _RateLimiter(max_rps, self.log) if max_rps is not None else None
@@ -239,6 +243,19 @@ class Kerberos:
     def _register_valid(self, username: str, password: str) -> None:
         """Registers a valid credential and logs the success message."""
         self._update_credentials_and_log(self.valid_credentials, self.log.success, self._MSG_VALID_CREDENTIAL, username, password,)
+        
+        # Mark user as owned in Neo4j if Neo4j instance is available
+        if self.neo4j_instance:
+            try:
+                success = self.neo4j_instance.mark_as_owned(username)
+                if success:
+                    with self._lock:
+                        self.neo4j_owned_count += 1
+                    self.log.info(f"{GREEN}[+]{RESET} {username} marked as owned in Neo4j")
+                else:
+                    self.log.debug(f"[!] {username} already marked as owned in Neo4j")
+            except Exception as e:
+                self.log.error(f"{RED}[-]{RESET} Error marking {username} as owned in Neo4j: {e}")
 
     def _register_failure(self, username: str, password: str, error_code: str, error_description: str) -> None:
         """Prints the appropriate message based on Kerberos error code name and updates the corresponding dictionary."""
@@ -262,6 +279,37 @@ class Kerberos:
         log_level = getattr(self.log, level_name, self.log.error) # Get the logging method based on the level name (e.g., logger.warning, logger.critical, etc.)
 
         self._update_credentials_and_log(dict_to_update, log_level, message_template, username, password, error_code, error_description)
+        
+        # Mark user as owned in Neo4j for expired passwords too
+        if error_code == "KDC_ERR_KEY_EXPIRED" and self.neo4j_instance:
+            try:
+                success = self.neo4j_instance.mark_as_owned(username)
+                if success:
+                    with self._lock:
+                        self.neo4j_owned_count += 1
+                    self.log.info(f"{GREEN}[+]{RESET} {username} marked as owned in Neo4j (expired password)")
+                else:
+                    self.log.debug(f"[!] {username} already marked as owned in Neo4j")
+            except Exception as e:
+                self.log.error(f"{RED}[-]{RESET} Error marking {username} (expired) as owned in Neo4j: {e}")
+
+    def get_statistics(self) -> Dict[str, int]:
+        """Returns a dictionary with attack statistics."""
+        with self._lock:
+            return {
+                "valid_credentials": len(self.valid_credentials),
+                "expired_credentials": len(self.expired_credentials),
+                "neo4j_owned": self.neo4j_owned_count,
+                "locked_accounts": len(self.locked_credentials),
+                "valid_usernames": len(self.valid_usernames),
+                "failed_attempts": len(self.failed_credentials),
+                "other_errors": len(self.other_errors)
+            }
+     
+    def get_valid_credentials_count(self) -> int:
+        """Returns the total number of valid credentials found (including expired passwords)."""
+        with self._lock:
+            return len(self.valid_credentials) + len(self.expired_credentials)
 
     def cleanup(self) -> None:
         """Removes the temporary `krb5.conf` file if it exists and cleans up the environment variable."""
