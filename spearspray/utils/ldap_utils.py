@@ -66,11 +66,15 @@ def handle_domain_password_policy(domain_policy: dict) -> None:
     )
 
 
-def get_users_from_ldap(ldap_instance, ldap_connection, query, fields):
+def get_users_from_ldap(ldap_instance, ldap_connection, query, fields, auth_username):
 
     search_entries = ldap_instance.search(ldap_connection, query, fields)
 
     if search_entries:
+
+        # Filter out authentication user before showing count
+        search_entries = filter_authentication_user(search_entries, auth_username)
+        
         if len(search_entries) == 1:
             log.success(f"{GREEN}[+]{RESET} Found {len(search_entries)} enabled user.")
         else:
@@ -79,6 +83,22 @@ def get_users_from_ldap(ldap_instance, ldap_connection, query, fields):
     else:
         log.error(f"{RED}[-]{RESET} No users found.")
         return
+
+def filter_authentication_user(users_objects: list[dict], auth_username: str) -> list[dict]:
+    """Filter out the LDAP authentication user from the target list."""
+    if not users_objects or not auth_username:
+        return users_objects
+        
+    initial_count = len(users_objects)
+    filtered_users = [
+        user for user in users_objects 
+        if user.get("sAMAccountName", "").lower() != auth_username.lower()
+    ]
+    
+    if len(filtered_users) < initial_count:
+        log.debug(f"{GREEN}[+]{RESET} Filtered out LDAP authentication user '{auth_username}' from target list.")
+    
+    return filtered_users
 
 def filter_threshold_users(users_objects: list[dict], domain_policy: dict, operator_threshold: int) -> list[dict]:
 
