@@ -93,6 +93,26 @@ files = [
 pyasn1 = ">=0.4.6"
 
 [[package]]
+name = "neo4j"
+version = "5.28.2"
+description = "Neo4j Bolt driver for Python"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "neo4j-5.28.2-py3-none-any.whl", hash = "sha256:5c53b5c3eee6dee7e920c9724391aa38d7135a651e71b766da00533b92a91a94"},
+    {file = "neo4j-5.28.2.tar.gz", hash = "sha256:7d38e27e4f987a45cc9052500c6ee27325cb23dae6509037fe31dd7ddaed70c7"},
+]
+
+[package.dependencies]
+pytz = "*"
+
+[package.extras]
+numpy = ["numpy (>=1.7.0,<3.0.0)"]
+pandas = ["numpy (>=1.7.0,<3.0.0)", "pandas (>=1.1.0,<3.0.0)"]
+pyarrow = ["pyarrow (>=1.0.0)"]
+
+[[package]]
 name = "prompt-toolkit"
 version = "3.0.51"
 description = "Library for building powerful interactive command lines in Python"
@@ -117,6 +137,18 @@ groups = ["main"]
 files = [
     {file = "pyasn1-0.6.1-py3-none-any.whl", hash = "sha256:0d632f46f2ba09143da3a8afe9e33fb6f92fa2320ab7e886e2d0f7672af84629"},
     {file = "pyasn1-0.6.1.tar.gz", hash = "sha256:6f580d2bdd84365380830acf45550f2511469f673cb4a5ae3857a3170128b034"},
+]
+
+[[package]]
+name = "pytz"
+version = "2025.2"
+description = "World timezone definitions, modern and historical"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "pytz-2025.2-py2.py3-none-any.whl", hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00"},
+    {file = "pytz-2025.2.tar.gz", hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3"},
 ]
 
 [[package]]
@@ -161,4 +193,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.8,<4.0"
-content-hash = "a34752f37ff4d94c3b3c73a0e88ffb006c5e612873b9264c25d3b37ca90b2e43"
+content-hash = "b18952db61ebcf3b08b1604aca442e07fcb314cacc57f42289eeef06533172db"
